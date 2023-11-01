@@ -1,0 +1,481 @@
+2019-11-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backport from mainline
+	2019-10-29  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/92267
+	* include/bits/stl_deque.h (_Deque_iterator(const _Deque_iterator&)):
+	Do not define as defaulted.
+	* testsuite/23_containers/deque/types/92267.cc: New test.
+
+2019-11-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/91355
+	* tree-ssa-sink.c (select_best_block): Use >= rather than >
+	for early_bb scaled count with best_bb count comparison.
+
+2019-11-21  Richard Biener  <rguenther@suse.de>
+
+	Revert
+	2019-09-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/91790
+	* tree-vect-stmts.c (vectorizable_load): For BB vectorization
+	use the correct DR for setting up realignment.
+
+2019-11-20  Peter Bergner <bergner@linux.ibm.com>
+
+	Backport from mainline
+	2019-11-07  Peter Bergner <bergner@linux.ibm.com>
+
+	PR other/92090
+	* config/rs6000/predicates.md (input_operand): Allow MODE_PARTIAL_INT
+	modes for integer constants.
+
+2019-11-20  Michael Matz  <matz@suse.de>
+
+	Backport from mainline
+	PR middle-end/90796
+	* gimple-loop-jam.c (any_access_function_variant_p): New function.
+	(adjust_unroll_factor): Use it to constrain safety, new parameter.
+	(tree_loop_unroll_and_jam): Adjust call and profitable unroll factor.
+
+2019-11-20  Joseph Myers  <joseph@codesourcery.com>
+
+	* doc/invoke.texi (-Wc11-c2x-compat): Document.
+
+--- libstdc++-v3/include/bits/stl_deque.h	(revision 278492)
++++ libstdc++-v3/include/bits/stl_deque.h	(revision 278614)
+@@ -158,13 +158,16 @@
+ #else
+       // Conversion from iterator to const_iterator.
+       template<typename _Iter,
+-              typename = _Require<is_same<_Self, const_iterator>,
+-                                  is_same<_Iter, iterator>>>
++	       typename = _Require<is_same<_Self, const_iterator>,
++				   is_same<_Iter, iterator>>>
+        _Deque_iterator(const _Iter& __x) noexcept
+        : _M_cur(__x._M_cur), _M_first(__x._M_first),
+-         _M_last(__x._M_last), _M_node(__x._M_node) { }
++	 _M_last(__x._M_last), _M_node(__x._M_node) { }
+ 
+-      _Deque_iterator(const _Deque_iterator&) = default;
++      _Deque_iterator(const _Deque_iterator& __x) noexcept
++       : _M_cur(__x._M_cur), _M_first(__x._M_first),
++	 _M_last(__x._M_last), _M_node(__x._M_node) { }
++
+       _Deque_iterator& operator=(const _Deque_iterator&) = default;
+ #endif
+ 
+--- libstdc++-v3/testsuite/23_containers/deque/types/92267.cc	(nonexistent)
++++ libstdc++-v3/testsuite/23_containers/deque/types/92267.cc	(revision 278614)
+@@ -0,0 +1,27 @@
++// Copyright (C) 2019 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// { dg-do compile { target c++11 } }
++
++#include <deque>
++
++using std::deque;
++using std::is_trivially_copy_constructible;
++
++// PR libstdc++/92267
++static_assert(!is_trivially_copy_constructible<deque<int>::iterator>::value);
++static_assert(!is_trivially_copy_constructible<deque<int>::const_iterator>::value);
+--- gcc/doc/invoke.texi	(revision 278492)
++++ gcc/doc/invoke.texi	(revision 278614)
+@@ -292,6 +292,7 @@
+ -Wbool-compare  -Wbool-operation @gol
+ -Wno-builtin-declaration-mismatch @gol
+ -Wno-builtin-macro-redefined  -Wc90-c99-compat  -Wc99-c11-compat @gol
++-Wc11-c2x-compat @gol
+ -Wc++-compat  -Wc++11-compat  -Wc++14-compat  -Wc++17-compat  @gol
+ -Wcast-align  -Wcast-align=strict  -Wcast-function-type  -Wcast-qual  @gol
+ -Wchar-subscripts  -Wcatch-value  -Wcatch-value=@var{n} @gol
+@@ -6698,6 +6699,14 @@
+ and so on.  This option is independent of the standards mode.  Warnings are
+ disabled in the expression that follows @code{__extension__}.
+ 
++@item -Wc11-c2x-compat @r{(C and Objective-C only)}
++@opindex Wc11-c2x-compat
++@opindex Wno-c11-c2x-compat
++Warn about features not present in ISO C11, but present in ISO C2X.
++For instance, warn about omitting the string in @code{_Static_assert}.
++This option is independent of the standards mode.  Warnings are
++disabled in the expression that follows @code{__extension__}.
++
+ @item -Wc++-compat @r{(C and Objective-C only)}
+ @opindex Wc++-compat
+ @opindex Wno-c++-compat
+--- gcc/testsuite/gcc.target/powerpc/pr92090-2.c	(nonexistent)
++++ gcc/testsuite/gcc.target/powerpc/pr92090-2.c	(revision 278614)
+@@ -0,0 +1,45 @@
++/* { dg-do compile } */
++/* { dg-options "-mdejagnu-cpu=power8 -Os -w" } */
++/* { dg-additional-options "-mbig" { target powerpc64le-*-* } } */
++
++/* Verify that we don't ICE.  */
++
++int a;
++static _Atomic long double b, c, d, m;
++double n;
++extern int foo (void);
++extern void bar (int, int, int, int);
++
++void
++bug (void)
++{
++  b = 1.79769313486231580793728971405301199e308L;
++  for (int i = 0; i < 10000; i++)
++    if (__builtin_isinf (n))
++      b;
++  c = 1;
++  int e, f, g, h;
++  while (a)
++    ;
++  for (int i; i; i++)
++    {
++      double j = c /= foo ();
++      if (__builtin_isinf (j))
++	{
++	  if (foo == 1 << 31)
++	    e++;
++	  f++;
++	  c = 0;
++	}
++      else
++	{
++	  if (foo == 1 << 30)
++	    g++;
++	  h++;
++	  c = 1;
++	}
++    }
++  bar (e, f, g, h);
++  d = 1.79769313486231580793728971405301199e308L;
++  m = 1;
++}
+--- gcc/testsuite/gcc.target/powerpc/pr92090.c	(nonexistent)
++++ gcc/testsuite/gcc.target/powerpc/pr92090.c	(revision 278614)
+@@ -0,0 +1,43 @@
++/* { dg-do compile } */
++/* { dg-options "-mdejagnu-cpu=power8 -Os" } */
++/* { dg-additional-options "-mbig" { target powerpc64le-*-* } } */
++
++/* Verify that we don't ICE.  */
++
++_Atomic int a;
++_Atomic long double b, c;
++int j;
++void foo (void);
++void bar (int, int, int, int);
++
++void
++bug (void)
++{
++  b = 1;
++  int d, e, f, g;
++  while (a)
++    ;
++  for (int h = 0; h < 10000; h++)
++    {
++      double i = b /= 3;
++      foo ();
++      if (i)
++	{
++	  if (i == 1)
++	    d++;
++	  e++;
++	  b = 0;
++	}
++      else
++	{
++	  if (i == 2)
++	    f++;
++	  g++;
++	  b = 1;
++	}
++    }
++  bar (d, e, f, g);
++  c = 1;
++  for (int h; h; h++)
++    j = 0;
++}
+--- gcc/testsuite/gcc.dg/unroll-and-jam.c	(revision 278492)
++++ gcc/testsuite/gcc.dg/unroll-and-jam.c	(revision 278614)
+@@ -1,5 +1,5 @@
+ /* { dg-do run } */
+-/* { dg-options "-O3 -floop-unroll-and-jam --param unroll-jam-min-percent=0 -fdump-tree-unrolljam-details" } */
++/* { dg-options "-O3 -floop-unroll-and-jam -fno-tree-loop-im --param unroll-jam-min-percent=0 -fdump-tree-unrolljam-details" } */
+ /* { dg-require-effective-target int32plus } */
+ 
+ #include <stdio.h>
+@@ -34,7 +34,7 @@
+ #define TEST(name, body, test) \
+ static void __attribute__((noinline,noclone)) name (unsigned long n, unsigned long m) \
+ { \
+-  unsigned long i, j; \
++  unsigned i, j; \
+   for (i = 1; i < m; i++) { \
+       for (j = 1; j < n; j++) { \
+ 	  body; \
+@@ -58,9 +58,14 @@
+ TEST(foo4, aa[i][j] = aa[i-1][j+1] * aa[i-1][j+1] / 2, checkaa()) //notok, -1,1
+ TEST(foo5, aa[i][j] = aa[i+1][j+1] * aa[i+1][j+1] / 2, checkaa()) //ok, 1,1
+ TEST(foo6, aa[i][j] = aa[i+1][j] * aa[i+1][j] / 2, checkaa()) //ok, -1,0
++TEST(foo61, aa[i][0] = aa[i+1][0] * aa[i+1][0] / 2, checkaa()) //notok, -1,0
++TEST(foo62, aa[i][j/2] = aa[i+1][j/2] * aa[i+1][j/2] / 2, checkaa()) //notok, not affine
++TEST(foo63, aa[i][j%2] = aa[i+1][j%2] * aa[i+1][j%2] / 2, checkaa()) //notok, not affine
+ TEST(foo7, aa[i+1][j] = aa[i][j] * aa[i][j] / 2, checkaa()) //ok, 1,0
+ TEST(foo9, b[j] = 3*b[j+1] + 1, checkb()) //notok, 0,-1
+ TEST(foo10, b[j] = 3*b[j] + 1, checkb()) //ok, 0,0
++extern int f;
++TEST(foo11, f = b[i-1] = 1 + 3* b[i+1], checkb()) //ok, 2,0 but must reduce unroll factor to 2, (it would be incorrect with unroll-by-3, which the profitability would suggest)
+ 
+ /* foo8 should work as well, but currently doesn't because the distance
+    vectors we compute are too pessimistic.  We compute
+@@ -68,6 +73,7 @@
+    and the last one causes us to lose.  */
+ TEST(foo8, b[j+1] = 3*b[j] + 1, checkb()) //ok, 0,1
+ 
++int f;
+ unsigned int a[1024];
+ unsigned int b[1024];
+ unsigned int aa[16][1024];
+@@ -88,10 +94,12 @@
+     printf(" %s\n", #name); \
+     init();for(i=0;i<4;i++)name##noopt(32,8); checka = checksum; \
+     init();for(i=0;i<4;i++)name(32,8); \
++    if (checka != checksum) fail = 1; \
+     printf("%sok %s\n", checka != checksum ? "NOT " : "", #name);
+ 
+ int main()
+ {
++  int fail = 0;
+   int i;
+   unsigned checka;
+   RUN(foo1);
+@@ -100,12 +108,18 @@
+   RUN(foo4);
+   RUN(foo5);
+   RUN(foo6);
++  RUN(foo61);
++  RUN(foo62);
++  RUN(foo63);
+   RUN(foo7);
+   RUN(foo8);
+   RUN(foo9);
+   RUN(foo10);
+-  return 0;
++  RUN(foo11);
++  if (fail)
++    __builtin_abort();
++  return fail;
+ }
+ 
+-/* Five loops should be unroll-jammed (actually six, but see above).  */
+-/* { dg-final { scan-tree-dump-times "applying unroll and jam" 5 "unrolljam" } } */
++/* Six loops should be unroll-jammed (actually seven, but see above).  */
++/* { dg-final { scan-tree-dump-times "applying unroll and jam" 6 "unrolljam" } } */
+--- gcc/testsuite/g++.dg/torture/pr91355.C	(nonexistent)
++++ gcc/testsuite/g++.dg/torture/pr91355.C	(revision 278614)
+@@ -0,0 +1,28 @@
++// PR tree-optimization/91355
++// { dg-do run }
++// { dg-options "-std=c++14" }
++
++unsigned int d = 0;
++
++struct S {
++  S () { d++; }
++  S (const S &) { d++; }
++  ~S () { d--; }
++};
++
++void
++foo (int i) throw (int) // { dg-warning "dynamic exception specifications are deprecated" }
++{
++  if (i == 0)
++    throw 3;
++  S d;
++  throw 3;
++}
++
++int
++main ()
++{
++  try { foo (1); } catch (...) {}
++  if (d)
++    __builtin_abort ();
++}
+--- gcc/tree-ssa-sink.c	(revision 278492)
++++ gcc/tree-ssa-sink.c	(revision 278614)
+@@ -229,7 +229,7 @@
+       /* If result of comparsion is unknown, preffer EARLY_BB.
+ 	 Thus use !(...>=..) rather than (...<...)  */
+       && !(best_bb->count.apply_scale (100, 1)
+-	   > (early_bb->count.apply_scale (threshold, 1))))
++	   >= early_bb->count.apply_scale (threshold, 1)))
+     return best_bb;
+ 
+   /* No better block found, so return EARLY_BB, which happens to be the
+--- gcc/tree-vect-stmts.c	(revision 278492)
++++ gcc/tree-vect-stmts.c	(revision 278614)
+@@ -8276,9 +8276,7 @@
+        || alignment_support_scheme == dr_explicit_realign)
+       && !compute_in_loop)
+     {
+-      msq = vect_setup_realignment (first_stmt_info_for_drptr
+-				    ? first_stmt_info_for_drptr
+-				    : first_stmt_info, gsi, &realignment_token,
++      msq = vect_setup_realignment (first_stmt_info, gsi, &realignment_token,
+ 				    alignment_support_scheme, NULL_TREE,
+ 				    &at_loop);
+       if (alignment_support_scheme == dr_explicit_realign_optimized)
+--- gcc/gimple-loop-jam.c	(revision 278492)
++++ gcc/gimple-loop-jam.c	(revision 278614)
+@@ -360,9 +360,26 @@
+   rewrite_into_loop_closed_ssa_1 (NULL, 0, SSA_OP_USE, loop);
+ }
+ 
++/* Return true if any of the access functions for dataref A
++   isn't invariant with respect to loop LOOP_NEST.  */
++static bool
++any_access_function_variant_p (const struct data_reference *a,
++			       const class loop *loop_nest)
++{
++  unsigned int i;
++  vec<tree> fns = DR_ACCESS_FNS (a);
++  tree t;
++
++  FOR_EACH_VEC_ELT (fns, i, t)
++    if (!evolution_function_is_invariant_p (t, loop_nest->num))
++      return true;
++
++  return false;
++}
++
+ /* Returns true if the distance in DDR can be determined and adjusts
+    the unroll factor in *UNROLL to make unrolling valid for that distance.
+-   Otherwise return false.
++   Otherwise return false.  DDR is with respect to the outer loop of INNER.
+ 
+    If this data dep can lead to a removed memory reference, increment
+    *REMOVED and adjust *PROFIT_UNROLL to be the necessary unroll factor
+@@ -369,7 +386,7 @@
+    for this to happen.  */
+ 
+ static bool
+-adjust_unroll_factor (struct data_dependence_relation *ddr,
++adjust_unroll_factor (class loop *inner, struct data_dependence_relation *ddr,
+ 		      unsigned *unroll, unsigned *profit_unroll,
+ 		      unsigned *removed)
+ {
+@@ -392,9 +409,59 @@
+ 	    gcc_unreachable ();
+ 	  else if ((unsigned)dist >= *unroll)
+ 	    ;
+-	  else if (lambda_vector_lexico_pos (dist_v + 1, DDR_NB_LOOPS (ddr) - 1)
+-		   || (lambda_vector_zerop (dist_v + 1, DDR_NB_LOOPS (ddr) - 1)
+-		       && dist > 0))
++	  else if (lambda_vector_zerop (dist_v + 1, DDR_NB_LOOPS (ddr) - 1))
++	    {
++	      /* We have (a,0) with a < N, so this will be transformed into
++	         (0,0) after unrolling by N.  This might potentially be a
++		 problem, if it's not a read-read dependency.  */
++	      if (DR_IS_READ (DDR_A (ddr)) && DR_IS_READ (DDR_B (ddr)))
++		;
++	      else
++		{
++		  /* So, at least one is a write, and we might reduce the
++		     distance vector to (0,0).  This is still no problem
++		     if both data-refs are affine with respect to the inner
++		     loops.  But if one of them is invariant with respect
++		     to an inner loop our reordering implicit in loop fusion
++		     corrupts the program, as our data dependences don't
++		     capture this.  E.g. for:
++		       for (0 <= i < n)
++		         for (0 <= j < m)
++		           a[i][0] = a[i+1][0] + 2;    // (1)
++		           b[i][j] = b[i+1][j] + 2;    // (2)
++		     the distance vector for both statements is (-1,0),
++		     but exchanging the order for (2) is okay, while
++		     for (1) it is not.  To see this, write out the original
++		     accesses (assume m is 2):
++		       a i j original
++		       0 0 0 r a[1][0] b[1][0]
++		       1 0 0 w a[0][0] b[0][0]
++		       2 0 1 r a[1][0] b[1][1]
++		       3 0 1 w a[0][0] b[0][1]
++		       4 1 0 r a[2][0] b[2][0]
++		       5 1 0 w a[1][0] b[1][0]
++		     after unroll-by-2 and fusion the accesses are done in
++		     this order (from column a): 0,1, 4,5, 2,3, i.e. this:
++		       a i j transformed
++		       0 0 0 r a[1][0] b[1][0]
++		       1 0 0 w a[0][0] b[0][0]
++		       4 1 0 r a[2][0] b[2][0]
++		       5 1 0 w a[1][0] b[1][0]
++		       2 0 1 r a[1][0] b[1][1]  
++		       3 0 1 w a[0][0] b[0][1]
++		     Note how access 2 accesses the same element as access 5
++		     for array 'a' but not for array 'b'.  */
++		  if (any_access_function_variant_p (DDR_A (ddr), inner)
++		      && any_access_function_variant_p (DDR_B (ddr), inner))
++		    ;
++		  else
++		    /* And if any dataref of this pair is invariant with
++		       respect to the inner loop, we have no chance than
++		       to reduce the unroll factor.  */
++		    *unroll = dist;
++		}
++	    }
++	  else if (lambda_vector_lexico_pos (dist_v + 1, DDR_NB_LOOPS (ddr) - 1))
+ 	    ;
+ 	  else
+ 	    *unroll = dist;
+@@ -486,7 +553,7 @@
+ 	  /* Now check the distance vector, for determining a sensible
+ 	     outer unroll factor, and for validity of merging the inner
+ 	     loop copies.  */
+-	  if (!adjust_unroll_factor (ddr, &unroll_factor, &profit_unroll,
++	  if (!adjust_unroll_factor (loop, ddr, &unroll_factor, &profit_unroll,
+ 				     &removed))
+ 	    {
+ 	      /* Couldn't get the distance vector.  For two reads that's
+@@ -506,7 +573,7 @@
+ 	 to ignore all profitability concerns and apply the transformation
+ 	 always.  */
+       if (!PARAM_VALUE (PARAM_UNROLL_JAM_MIN_PERCENT))
+-	profit_unroll = 2;
++	profit_unroll = MAX(2, profit_unroll);
+       else if (removed * 100 / datarefs.length ()
+ 	  < (unsigned)PARAM_VALUE (PARAM_UNROLL_JAM_MIN_PERCENT))
+ 	profit_unroll = 1;
+--- gcc/config/rs6000/predicates.md	(revision 278492)
++++ gcc/config/rs6000/predicates.md	(revision 278614)
+@@ -1053,8 +1053,7 @@
+     return 1;
+ 
+   /* Allow any integer constant.  */
+-  if (GET_MODE_CLASS (mode) == MODE_INT
+-      && CONST_SCALAR_INT_P (op))
++  if (SCALAR_INT_MODE_P (mode) && CONST_SCALAR_INT_P (op))
+     return 1;
+ 
+   /* Allow easy vector constants.  */
