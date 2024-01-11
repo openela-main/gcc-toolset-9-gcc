@@ -1,0 +1,6 @@
+SOURCES/doxygen-1.8.0.src.tar.gz
+SOURCES/gcc-9.2.1-20191120.tar.xz
+SOURCES/isl-0.16.1.tar.bz2
+SOURCES/mpc-0.8.1.tar.gz
+SOURCES/nvptx-newlib-aadc8eb0ec43b7cd0dd2dfb484bae63c8b05ef24.tar.xz
+SOURCES/nvptx-tools-c28050f60193b3b95a18866a96f03334e874e78f.tar.xz
